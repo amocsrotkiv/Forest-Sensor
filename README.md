@@ -1,2 +1,0 @@
-# Forest-Sensor
-valami
