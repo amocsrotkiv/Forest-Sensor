@@ -293,12 +293,12 @@ static void notification_timeout_handler(void * p_context)
     APP_ERROR_CHECK(err_code);
 }
 
-/* static void lora_send_timeout_handler(void * p_context)
+ static void lora_send_timeout_handler(void * p_context)
 {
     UNUSED_PARAMETER(p_context);
 	
 	ble_lora_send();
-} */
+} 
 /**@brief Function for the Timer initialization.
  *
  * @details Initializes the timer module. This creates and starts application timers.
@@ -318,8 +318,8 @@ static void timers_init(void)
                  For every new timer needed, increase the value of the macro APP_TIMER_MAX_TIMERS by
                  one.*/
     
-      /*  err_code = app_timer_create(&lora_send_timer_id, APP_TIMER_MODE_REPEATED, lora_send_timeout_handler);
-       APP_ERROR_CHECK(err_code);  */
+      err_code = app_timer_create(&lora_send_timer_id, APP_TIMER_MODE_REPEATED, lora_send_timeout_handler);
+       APP_ERROR_CHECK(err_code);  
 }
 
 
@@ -412,16 +412,16 @@ static void on_cus_evt(ble_cus_t     * p_cus_service,
             
              err_code = app_timer_start(m_notification_timer_id, NOTIFICATION_INTERVAL, NULL);
              APP_ERROR_CHECK(err_code);
-			 /* err_code = app_timer_start(lora_send_timer_id,LORA_SEND_INTERVAL, NULL);
-             APP_ERROR_CHECK(err_code); */
+			  err_code = app_timer_start(lora_send_timer_id,LORA_SEND_INTERVAL, NULL);
+             APP_ERROR_CHECK(err_code); 
              break;
 
         case BLE_CUS_EVT_NOTIFICATION_DISABLED:
 
             err_code = app_timer_stop(m_notification_timer_id);
             APP_ERROR_CHECK(err_code);
-			/* err_code = app_timer_stop(lora_send_timer_id);
-            APP_ERROR_CHECK(err_code); */
+			err_code = app_timer_stop(lora_send_timer_id);
+            APP_ERROR_CHECK(err_code); 
             break;
 
         case BLE_CUS_EVT_CONNECTED:
@@ -916,15 +916,15 @@ int main(void)
     
 
     advertising_start(erase_bonds);
-	/*
-	            sx127x_init(LORA_SPI_MOSI,
+	
+	            /*sx127x_init(LORA_SPI_MOSI,
 				LORA_SPI_MISO,
 				LORA_SPI_CLK,
 				LORA_SPI_SELECT,
-				LORA_RESET,NULL);
+				LORA_RESET,NULL);*/
 	
 	NRF_LOG_RAW_INFO("LORA INIT DONE\r\n");
- */
+ 
 
 
     // Enter main loop.
