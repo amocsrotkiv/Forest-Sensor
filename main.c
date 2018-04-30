@@ -50,6 +50,8 @@
  * It can easily be used as a starting point for creating a new application, the comments identified
  * with 'YOUR_JOB' indicates where and how you can customize.
  */
+ 
+
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -95,11 +97,13 @@
 #define SLAVE_LATENCY                   0                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
 
+
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000)                  /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                       /**< Number of attempts before giving up the connection parameter negotiation. */
 
-#define NOTIFICATION_INTERVAL           APP_TIMER_TICKS(1000)     
+#define NOTIFICATION_INTERVAL           APP_TIMER_TICKS(1000)    
+#define LORA_SEND_INTERVAL              APP_TIMER_TICKS(15000)  
 
 #define SEC_PARAM_BOND                  1                                       /**< Perform bonding. */
 #define SEC_PARAM_MITM                  0                                       /**< Man In The Middle protection not required. */
@@ -112,6 +116,12 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
+#define LORA_SPI_MOSI					3
+#define LORA_SPI_MISO					4
+#define LORA_SPI_CLK					28
+#define LORA_SPI_SELECT					30
+#define LORA_RESET						21
+
 
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 BLE_CUS_DEF(m_cus); //konkrét szervíz példányosítása
@@ -119,7 +129,10 @@ BLE_ADVERTISING_DEF(m_advertising);                                             
 
 APP_TIMER_DEF(m_notification_timer_id);
 
+APP_TIMER_DEF(lora_send_timer_id);
+
 static uint8_t m_custom_value = 0;
+
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
 
@@ -280,6 +293,12 @@ static void notification_timeout_handler(void * p_context)
     APP_ERROR_CHECK(err_code);
 }
 
+/* static void lora_send_timeout_handler(void * p_context)
+{
+    UNUSED_PARAMETER(p_context);
+	
+	ble_lora_send();
+} */
 /**@brief Function for the Timer initialization.
  *
  * @details Initializes the timer module. This creates and starts application timers.
@@ -297,10 +316,10 @@ static void timers_init(void)
     /* YOUR_JOB: Create any timers to be used by the application.
                  Below is an example of how to create a timer.
                  For every new timer needed, increase the value of the macro APP_TIMER_MAX_TIMERS by
-                 one.
-       ret_code_t err_code;
-       err_code = app_timer_create(&m_app_timer_id, APP_TIMER_MODE_REPEATED, timer_timeout_handler);
-       APP_ERROR_CHECK(err_code); */
+                 one.*/
+    
+      /*  err_code = app_timer_create(&lora_send_timer_id, APP_TIMER_MODE_REPEATED, lora_send_timeout_handler);
+       APP_ERROR_CHECK(err_code);  */
 }
 
 
@@ -393,12 +412,16 @@ static void on_cus_evt(ble_cus_t     * p_cus_service,
             
              err_code = app_timer_start(m_notification_timer_id, NOTIFICATION_INTERVAL, NULL);
              APP_ERROR_CHECK(err_code);
+			 /* err_code = app_timer_start(lora_send_timer_id,LORA_SEND_INTERVAL, NULL);
+             APP_ERROR_CHECK(err_code); */
              break;
 
         case BLE_CUS_EVT_NOTIFICATION_DISABLED:
 
             err_code = app_timer_stop(m_notification_timer_id);
             APP_ERROR_CHECK(err_code);
+			/* err_code = app_timer_stop(lora_send_timer_id);
+            APP_ERROR_CHECK(err_code); */
             break;
 
         case BLE_CUS_EVT_CONNECTED:
@@ -425,12 +448,12 @@ static void services_init(void)
         memset(&cus_init, 0, sizeof(cus_init));
         cus_init.evt_handler                = on_cus_evt;// a service kezdeti event_handlerja az itt megadott függvény lesz
 		//Engedélyezzük a peernek hogy ténylegesen írja vagy olvassa a karakterisztikus értéket
-        BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.custom_value_char_attr_md.cccd_write_perm);
+        // BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.custom_value_char_attr_md.cccd_write_perm);
         BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.custom_value_char_attr_md.read_perm);
-        BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.custom_value_char_attr_md.write_perm);
+        //BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.custom_value_char_attr_md.write_perm);
 		
 		//Engedélyezzük a peernek hogy ténylegesen írja vagy olvassa a viktor karakterisztikus értéket
-        /*BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.viktor_value_char_attr_md.cccd_write_perm); Ez most nekünk nem kell*/
+        BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.viktor_value_char_attr_md.cccd_write_perm);
         BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.viktor_value_char_attr_md.read_perm);
         BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cus_init.viktor_value_char_attr_md.write_perm);
     
@@ -502,7 +525,6 @@ static void application_timers_start(void)
        ret_code_t err_code;
        err_code = app_timer_start(m_app_timer_id, TIMER_INTERVAL, NULL);
        APP_ERROR_CHECK(err_code); */
-
 }
 
 
@@ -540,7 +562,7 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
     switch (ble_adv_evt)
     {
         case BLE_ADV_EVT_FAST:
-            NRF_LOG_INFO("Fast advertising.");
+            NRF_LOG_INFO("Fast advertising.1");
             err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
             APP_ERROR_CHECK(err_code);
             break;
@@ -836,7 +858,7 @@ static void advertising_start(bool erase_bonds)
     if (erase_bonds == true)
     {
         delete_bonds();
-        // Advertising is started by PM_EVT_PEERS_DELETED_SUCEEDED evetnt
+        // Advertising is started by PM_EVT_PEERS_DELETED_SUCEEDED event
     }
     else
     {
@@ -845,6 +867,31 @@ static void advertising_start(bool erase_bonds)
         APP_ERROR_CHECK(err_code);
     }
 }
+/*Lora module*/
+/*static void lora_pktReceived(uint8_t *pktData)
+{
+		NRF_LOG_RAW_INFO("lora_pktReceived():\r\n");
+		NRF_LOG_RAW_INFO("%d- %d- %d- %d-\r\n",pktData[0],pktData[1],pktData[2],pktData[3]);
+		NRF_LOG_RAW_INFO("%d- %d- %d- %d-\r\n",pktData[4],pktData[5],pktData[6],pktData[7]);
+    NRF_LOG_RAW_INFO("%d- %d- %d- %d-\r\n",pktData[8],pktData[9],pktData[10],pktData[11]);
+	  NRF_LOG_RAW_INFO("%d- %d- %d-\r\n",pktData[12],pktData[13],pktData[14]);
+
+	
+}*/
+/*ADÓ oldal*/
+/*if(sendcycle==10){
+						sendcycle=0;
+					}
+					else{
+						sendcycle++;
+					}
+			    	
+			    	memcpy(lora_txpkt,(sendbuffer+(sendcycle*15)),15*sizeof(uint8_t))
+					sx127x_sendPkt(lora_txpkt);
+					
+					*/
+
+
 
 
 /**@brief Function for application main entry.
@@ -865,10 +912,20 @@ int main(void)
     peer_manager_init();
 
     // Start execution.
-    NRF_LOG_INFO("Template example started.");
-    application_timers_start();
+    NRF_LOG_INFO("Viktor example started.");
+    
 
     advertising_start(erase_bonds);
+	/*
+	            sx127x_init(LORA_SPI_MOSI,
+				LORA_SPI_MISO,
+				LORA_SPI_CLK,
+				LORA_SPI_SELECT,
+				LORA_RESET,NULL);
+	
+	NRF_LOG_RAW_INFO("LORA INIT DONE\r\n");
+ */
+
 
     // Enter main loop.
     for (;;)

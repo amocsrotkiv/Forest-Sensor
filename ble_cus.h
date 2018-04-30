@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "nrf_log.h"
+#include "nrf_log_ctrl.h"
 #include "ble.h"
 #include "ble_srv_common.h"
 
@@ -58,10 +60,10 @@ typedef void (*ble_cus_evt_handler_t) (ble_cus_t * p_bas, ble_cus_evt_t * p_evt)
 typedef struct
 {
     ble_cus_evt_handler_t         evt_handler;                    /**< Event handler to be called for handling events in the Custom Service. */
-    char                         initial_custom_value[20];           /** Itt ez valami kezdeti érték< Initial custom value */
+    uint8_t                        initial_custom_value[20];           /** Itt ez valami kezdeti érték< Initial custom value */
 	ble_srv_cccd_security_mode_t  custom_value_char_attr_md;     /**< Initial security level for Custom characteristics attribute */
 	uint8_t						  initial_viktor_value;
-	ble_srv_cccd_security_mode_t  viktor_value_char_attr_md;     /**< Initial security level for Custom characteristics attribute */
+	ble_srv_cccd_security_mode_t  viktor_value_char_attr_md;     /**< Initial security level for Viktor characteristics attribute */
 } ble_cus_init_t;
 
 /**  Az adott szervizünk struktúrája.Minden a servicehez tartozó információt
@@ -76,6 +78,10 @@ struct ble_cus_s
     uint8_t                       uuid_type; 	// ez a mező kell mikor a BLE UUID táblájához hozzáadjuk a saját Base UUIdnkat
 	ble_gatts_char_handles_t      viktor_value_handles;
 };
+
+/*LORA*/
+void ble_lora_send(void);
+/*LORA*/
 
 /**@brief Function for initializing the Custom Service.
  *

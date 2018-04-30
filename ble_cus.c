@@ -5,9 +5,31 @@
 #include "nrf_gpio.h"
 #include "boards.h"
 #include "nrf_log.h"
+#include "mem_manager.c"
+#include "mem_manager.h"
+ #include "sx127x_drv.c"
+ 
+static uint8_t lora_txpkt[15]; /*LORA packet*/
+static uint32_t sendcycle=0; /*LORA packet*/
 
-static int readnumber=1;
-static int writenumber=1;
+static int combinedsize=0; //for viktor_value write
+static int readnumber=0; //for cccd read
+char sendbuffer[160]; 
+
+void ble_lora_send(void){
+	
+	     if(sendcycle==10){
+						sendcycle=0;
+					}
+					else{
+						sendcycle++;
+					}
+			    	
+			    	memcpy(lora_txpkt,(sendbuffer+(sendcycle*15)),15*sizeof(uint8_t));
+					sx127x_sendPkt(lora_txpkt); 
+}
+
+
 
 /**@brief Function for handling the Connect event.
  *
@@ -43,7 +65,6 @@ static void on_disconnect(ble_cus_t * p_cus, ble_evt_t const * p_ble_evt)
 }
 
 
-static char buffer[160];
 
 /**@brief Function for handling the Write event.
  *
@@ -54,7 +75,8 @@ static char buffer[160];
 static void on_write(ble_cus_t * p_cus, ble_evt_t const * p_ble_evt)
 {
     ble_gatts_evt_write_t const * p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;//get hold of the Write event parameters
-    
+    uint32_t i=0;
+	
     // Custom Value Characteristic Written to.
     if (p_evt_write->handle == p_cus->custom_value_handles.value_handle)
     {
@@ -75,28 +97,6 @@ static void on_write(ble_cus_t * p_cus, ble_evt_t const * p_ble_evt)
          //do nothing
         }
 		
-		if(writenumber==8){
-			writenumber=1;
-			NRF_LOG_DEBUG("%d writenumber:\r\n", writenumber);  
-		}
-		else{
-			writenumber++;
-			 NRF_LOG_DEBUG("%d wrtienumber:\r\n", writenumber); 
-		}
-		
-		uint32_t err_code = NRF_SUCCESS;
-		/*
-		uint8_t buffer[20]; //ebbe a bufferbe várjuk a 20 byteot
-		ble_gatts_value_t rx_data; //struktúra az adat fgoadáshoz
-		memset(&rx_data, 0, sizeof(rx_data)); //triv.
-		
-		rx_data.len=20;//20 byteos adatot várunk
-		rx_data.p_value = &buffer[0]; //rámutatunk a cél bufferre
-		rx_data.offset=0;//offset 0
-		
-		err_code = sd_ble_gatts_value_get(p_cus->conn_handle, p_cus->custom_value_handles.value_handle,&rx_data);// a custom valueból megszerezzük az adatot
-		err_code = sd_ble_gatts_value_set(p_cus->conn_handle,p_cus->viktor_value_handles.value_handle,&rx_data);// majd tovvábbadjuk a viktor valuenak(mobilon látható lesz:))
-		*/
     }
 	
 	/**Viktor valuet irjuk**/
@@ -116,27 +116,42 @@ static void on_write(ble_cus_t * p_cus, ble_evt_t const * p_ble_evt)
         }	
 		uint32_t err_code = NRF_SUCCESS;
 		
-		uint8_t buffer[20]; //ebbe a bufferbe várjuk a 20 byteot
-		ble_gatts_value_t rx_data; //struktúra az adat fgoadáshoz
-		memset(&rx_data, 0, sizeof(rx_data)); //triv.
-		
-		rx_data.len=20;//20 byteos adatot várunk
-		rx_data.p_value = &buffer[0]; //rámutatunk a cél bufferre
-		rx_data.offset=0;//offset 0
-		err_code = sd_ble_gatts_value_get(p_cus->conn_handle, p_cus->viktor_value_handles.value_handle,&rx_data);// a custom valueból megszerezzük az adatot	
-		//Feladat_Belekéne másolni a static char buffer-be az i dik 20 bytery az rx-ben megkapott adatot 
+		//copying the just got data to this buffer "static char sendbuffer[160]"
+		for(i=combinedsize;i<p_evt_write->len+combinedsize;i++)
+		{
+			sendbuffer[i]=p_evt_write->data[i-combinedsize];
+		}
+		combinedsize+=p_evt_write->len;
 		
 		
+		//160 bytes can be sent to the other device over LORA
+		if(160-combinedsize<20){
+			combinedsize=0;
+		}
 		
+		NRF_LOG_INFO("%d",combinedsize);
+		/**csúnya megoldás**/
     }
 	
 	/**/
 
-    // Check if the Custom value CCCD is written to and that the value is the appropriate length, i.e 2 bytes.
-    if ((p_evt_write->handle == p_cus->custom_value_handles.cccd_handle)
+    // Check if the Viktor value CCCD is written to and that the value is the appropriate length, i.e 2 bytes.
+    if ((p_evt_write->handle == p_cus->viktor_value_handles.cccd_handle)
         && (p_evt_write->len == 2)
        )
     {
+		if(*p_evt_write->data == 0x0100)
+        {
+            nrf_gpio_pin_clear(20); 
+        }	
+		else if(*p_evt_write->data == 0x0000)
+        {
+            nrf_gpio_pin_set(20); 
+        }
+        else
+        {
+         //do nothing
+        }	
         // CCCD written, call application event handler
         if (p_cus->evt_handler != NULL)
         {
@@ -181,6 +196,8 @@ void ble_cus_on_ble_evt( ble_evt_t const * p_ble_evt, void * p_context)
 /*Whenever a characteristic is written to, a BLE_GATTS_EVT_WRITE event will be propagated to the application
 ? and dispatched to the functions in ble_evt_dispatch()? ez vajon mit jelent*/
         case BLE_GATTS_EVT_WRITE:
+		NRF_LOG_INFO("Valami\n\r");
+		NRF_LOG_FLUSH();
             on_write(p_cus, p_ble_evt);
             break;
 /* Handling this event is not necessary
@@ -225,19 +242,18 @@ static uint32_t custom_value_char_add(ble_cus_t * p_cus, const ble_cus_init_t * 
     /*The descriptor is an attribute with additional information about the characteristic.
 	The CCCD is a writable descriptor that allows the client, 
 	i.e. your MCP or phone, to enable or disable notification or indication, on your kit.*/
-    cccd_md.write_perm = p_cus_init->custom_value_char_attr_md.cccd_write_perm;
+    cccd_md.write_perm = p_cus_init->viktor_value_char_attr_md.cccd_write_perm;
     cccd_md.vloc       = BLE_GATTS_VLOC_STACK;
-	/*BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);*/
 
     memset(&char_md, 0, sizeof(char_md));
 
     char_md.char_props.read   = 1;
-    char_md.char_props.write  = 1;
-    char_md.char_props.notify = 1;  //Enable notification by setting the notify property bit
+    char_md.char_props.write  = 0;//NEM akarom engedélyezni az írását
+    char_md.char_props.notify = 0;  //Disable notification by setting the notify property bit to 0
     char_md.p_char_user_desc  = NULL;
     char_md.p_char_pf         = NULL;
     char_md.p_user_desc_md    = NULL;
-    char_md.p_cccd_md         = &cccd_md; 
+    char_md.p_cccd_md         = NULL; //&cccd_md volt; 
     char_md.p_sccd_md         = NULL;
 	/*This will add a Client Characteristic Configuration Descriptor or CCCD to the Custom Value Characteristic
 	which allows us to enable or disable notifications by writing to the CCCD.
@@ -251,7 +267,7 @@ static uint32_t custom_value_char_add(ble_cus_t * p_cus, const ble_cus_init_t * 
     memset(&attr_md, 0, sizeof(attr_md));
 
     attr_md.read_perm  = p_cus_init->custom_value_char_attr_md.read_perm;  //tényleges engedélyezés
-    attr_md.write_perm = p_cus_init->custom_value_char_attr_md.write_perm; //ez is
+   //NE lehessen írni// attr_md.write_perm = p_cus_init->custom_value_char_attr_md.write_perm; //ez is
     attr_md.vloc       = BLE_GATTS_VLOC_STACK; //stackbe tároljuk a metadatát
     attr_md.rd_auth    = 0;
     attr_md.wr_auth    = 0;
@@ -259,7 +275,7 @@ static uint32_t custom_value_char_add(ble_cus_t * p_cus, const ble_cus_init_t * 
 
     memset(&attr_char_value, 0, sizeof(attr_char_value));
 	
-   char value[]            = "V1 segelykero allomas GPS:47.470 19.0566"; //próbaképpen inicializáljuk
+   char value[]            = "1:V1 segelykero allomas GPS:47.470 19.0566"; // inicializáljuk
 
     attr_char_value.p_uuid    = &ble_uuid;
     attr_char_value.p_attr_md = &attr_md;
@@ -283,12 +299,20 @@ static uint32_t custom_value_char_add(ble_cus_t * p_cus, const ble_cus_init_t * 
 
     ble_uuid.type = p_cus->uuid_type;		//beállítjuk a karakterisztika UUID-jét és annak a típusát is
     ble_uuid.uuid = VIKTOR_VALUE_CHAR_UUID; //pointerként továbbadjuk a karakterisztika értékének
-	
 	attr_char_value.p_uuid    = &ble_uuid;
-	char_md.char_props.notify = 0;  //Enable notification by setting the notify property 
-	char_md.p_cccd_md         = NULL;
+	
+	char_md.char_props.notify = 1;  //Enable notification by setting the notify property 
+	char_md.p_cccd_md         = &cccd_md;
+	char_md.char_props.write  = 1; //őt lehessen írni
+	
 	attr_md.read_perm  = p_cus_init->viktor_value_char_attr_md.read_perm;  //tényleges engedélyezés
     attr_md.write_perm = p_cus_init->viktor_value_char_attr_md.write_perm; //ez is
+	
+	uint8_t viktor_value_init[1]={0};
+	attr_char_value.init_len  = sizeof(uint8_t); // It has 1 byte at the beggining
+    attr_char_value.init_offs = 0;
+    attr_char_value.max_len   = 20*sizeof(uint8_t); 	   // eredetileg 'sizeof(uint8_t);
+	attr_char_value.p_value     = viktor_value_init;
 
 /*1:melyik servicehez tartozik,2:a leíró metadata(magyarul mit tud),3:mi az 4:ide kapjuk meg a handlejét a krakterisztikának*/
     err_code = sd_ble_gatts_characteristic_add(p_cus->service_handle, 
@@ -350,43 +374,41 @@ uint32_t ble_cus_init(ble_cus_t * p_cus, const ble_cus_init_t * p_cus_init)
     return custom_value_char_add(p_cus, p_cus_init);
 }
 
-/*This is where we will implement the notification*/
+/*This is where we will implement the notification of !viktor_value!*/
 uint32_t ble_cus_custom_value_update(ble_cus_t * p_cus, uint8_t custom_value)
 {
     NRF_LOG_INFO("In ble_cus_custom_value_update. \r\n"); 
-	int i=0;
+	int i;
     if (p_cus == NULL)
     {
         return NRF_ERROR_NULL;
 	}
 	uint32_t err_code = NRF_SUCCESS;
-		/*Saját cucc*/
-		uint8_t value[8]  = {0x00,0x00,0x56,0x78,0x01,0x02,0x03,0x04};
-		
-		ble_gatts_value_t rx_data;
-		rx_data.len=8;
-		rx_data.offset=0;
-    err_code = sd_ble_gatts_value_get(p_cus->conn_handle,
-                                      p_cus->custom_value_handles.value_handle,
-                                      &rx_data);
-		rx_data.p_value[1]++;
-		
-		for(i=0;i<8;i++){
-			printf("%d",rx_data.p_value[i]);
+	uint8_t value[20];
+	
+	for(i=0;i<20;i++)  {
+		value[i]=sendbuffer[(20*readnumber)+i];
 		}
-		/**/
+	if(readnumber==7)
+	{ 
+		readnumber=0;
+	} 
+	else  {
+		readnumber++;
+		  }
+		
     ble_gatts_value_t gatts_value;
 	
-    // Initialize value struct.Most:Update the value in the GATT table
+    // Initialize value struct. NOW:Update the value in the GATT table
     memset(&gatts_value, 0, sizeof(gatts_value));
 
-    gatts_value.len     = 8; //eredetileg 'sizeof(uint8_t)' ami 1byte
+    gatts_value.len     = 20; 
     gatts_value.offset  = 0;
-    gatts_value.p_value = value;/*'rx_data.p_value'-val nem működik*/ /*&custom_value;eredetileg*/
+    gatts_value.p_value = value;
 
     // Update database.
     err_code = sd_ble_gatts_value_set(p_cus->conn_handle,
-                                      p_cus->custom_value_handles.value_handle,
+                                      p_cus->viktor_value_handles.value_handle,
                                       &gatts_value);
     if (err_code != NRF_SUCCESS)
     {
@@ -403,7 +425,7 @@ uint32_t ble_cus_custom_value_update(ble_cus_t * p_cus, uint8_t custom_value)
 
         memset(&hvx_params, 0, sizeof(hvx_params));
 
-        hvx_params.handle = p_cus->custom_value_handles.value_handle;//The SoftDevice needs to know what characteristic value we are working on
+        hvx_params.handle = p_cus->viktor_value_handles.value_handle;//The SoftDevice needs to know what characteristic value we are working on
         hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;//The other option would be BLE_GATT_HVX_INDICATION.
         hvx_params.offset = gatts_value.offset;//Your characteristic value might be a sequence of many bytes. If you want to transmit only a couple of these bytes and the bytes are located in the middle of the sequence you can use the offset to extract them.
         hvx_params.p_len  = &gatts_value.len;//The SoftDevice needs to know how many bytes to transmit. 
