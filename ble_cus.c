@@ -373,6 +373,75 @@ uint32_t ble_cus_init(ble_cus_t * p_cus, const ble_cus_init_t * p_cus_init)
     // Add Custom Value characteristic
     return custom_value_char_add(p_cus, p_cus_init);
 }
+uint32_t lora_value_update(ble_cus_t * p_cus, uint8_t *pktData)
+{
+	   NRF_LOG_INFO("In ble_cus_custom_value_update. \r\n"); 
+	int i;
+    if (p_cus == NULL)
+    {
+        return NRF_ERROR_NULL;
+	}
+	uint32_t err_code = NRF_SUCCESS;
+	uint8_t value[20];
+	
+	for(i=0;i<20;i++)  {
+		value[i]=pktData[(20*readnumber)+i];
+		}
+	if(readnumber==7)
+	{ 
+		readnumber=0;
+	} 
+	else  {
+		readnumber++;
+		  }
+		
+    ble_gatts_value_t gatts_value;
+	
+    // Initialize value struct; NOW:Update the value in the GATT table
+    memset(&gatts_value, 0, sizeof(gatts_value));
+
+    gatts_value.len     = 20; 
+    gatts_value.offset  = 0;
+    gatts_value.p_value = value;
+
+    // Update database.
+    err_code = sd_ble_gatts_value_set(p_cus->conn_handle,
+                                      p_cus->viktor_value_handles.value_handle,
+                                      &gatts_value);
+    if (err_code != NRF_SUCCESS)
+    {
+        return err_code;
+    }
+	/*After updating the value in the GATT table we're ready to notify our peer 
+	that the value of our Custom Value Characteristic has changed.*/
+    // Send value if connected and notifying.
+    if ((p_cus->conn_handle != BLE_CONN_HANDLE_INVALID)) 
+    {
+	/*hvx stands for Handle Value X, where X symbolize either notification or indication 
+	as the struct and function can be used for both*/
+        ble_gatts_hvx_params_t hvx_params;
+
+        memset(&hvx_params, 0, sizeof(hvx_params));
+
+        hvx_params.handle = p_cus->viktor_value_handles.value_handle;//The SoftDevice needs to know what characteristic value we are working on
+        hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;//The other option would be BLE_GATT_HVX_INDICATION.
+        hvx_params.offset = gatts_value.offset;//Your characteristic value might be a sequence of many bytes. If you want to transmit only a couple of these bytes and the bytes are located in the middle of the sequence you can use the offset to extract them.
+        hvx_params.p_len  = &gatts_value.len;//The SoftDevice needs to know how many bytes to transmit. 
+        hvx_params.p_data = gatts_value.p_value; /*eredetileg valami random memóriatartalmat inkrementáltunk*/
+
+        err_code = sd_ble_gatts_hvx(p_cus->conn_handle, &hvx_params);
+        NRF_LOG_INFO("sd_ble_gatts_hvx result: %x. \r\n", err_code); 
+    }
+    else
+    {
+        err_code = NRF_ERROR_INVALID_STATE;
+        NRF_LOG_INFO("sd_ble_gatts_hvx result: NRF_ERROR_INVALID_STATE. \r\n"); 
+    }
+
+
+    return err_code;
+	
+}
 
 /*This is where we will implement the notification of !viktor_value!*/
 uint32_t ble_cus_custom_value_update(ble_cus_t * p_cus, uint8_t custom_value)
@@ -399,7 +468,7 @@ uint32_t ble_cus_custom_value_update(ble_cus_t * p_cus, uint8_t custom_value)
 		
     ble_gatts_value_t gatts_value;
 	
-    // Initialize value struct. NOW:Update the value in the GATT table
+    // Initialize value struct; NOW:Update the value in the GATT table
     memset(&gatts_value, 0, sizeof(gatts_value));
 
     gatts_value.len     = 20; 

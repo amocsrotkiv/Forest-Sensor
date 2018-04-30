@@ -120,6 +120,8 @@ void ble_cus_on_ble_evt( ble_evt_t const * p_ble_evt, void * p_context);
 
 uint32_t ble_cus_custom_value_update(ble_cus_t * p_cus, uint8_t custom_value);
 
+uint32_t lora_value_update(ble_cus_t * p_cus, uint8_t *pktData);
+
 /*Ez eredetileg nem is volt itt !? This code belongs in ble_cus.h*/
 
 /**@brief Function for adding the Custom Value characteristic.
