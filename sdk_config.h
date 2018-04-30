@@ -397,7 +397,7 @@
 // <e> APP_USBD_CONFIG_LOG_ENABLED - Enable logging in the module
 //==========================================================
 #ifndef APP_USBD_CONFIG_LOG_ENABLED
-#define APP_USBD_CONFIG_LOG_ENABLED 0
+#define APP_USBD_CONFIG_LOG_ENABLED 1
 #endif
 // <o> APP_USBD_CONFIG_LOG_LEVEL  - Default Severity level
  
@@ -408,7 +408,7 @@
 // <4=> Debug 
 
 #ifndef APP_USBD_CONFIG_LOG_LEVEL
-#define APP_USBD_CONFIG_LOG_LEVEL 3
+#define APP_USBD_CONFIG_LOG_LEVEL 4
 #endif
 
 // <o> APP_USBD_CONFIG_INFO_COLOR  - ANSI escape code prefix.
@@ -1456,7 +1456,7 @@
 // <e> SPI_ENABLED - nrf_drv_spi - SPI/SPIM peripheral driver
 //==========================================================
 #ifndef SPI_ENABLED
-#define SPI_ENABLED 0
+#define SPI_ENABLED 1
 #endif
 // <o> SPI_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
  
@@ -1478,13 +1478,13 @@
 // <e> SPI0_ENABLED - Enable SPI0 instance
 //==========================================================
 #ifndef SPI0_ENABLED
-#define SPI0_ENABLED 0
+#define SPI0_ENABLED 1
 #endif
 // <q> SPI0_USE_EASY_DMA  - Use EasyDMA
  
 
 #ifndef SPI0_USE_EASY_DMA
-#define SPI0_USE_EASY_DMA 1
+#define SPI0_USE_EASY_DMA 0
 #endif
 
 // <o> SPI0_DEFAULT_FREQUENCY  - SPI frequency
@@ -1498,7 +1498,7 @@
 // <2147483648=> 8 MHz 
 
 #ifndef SPI0_DEFAULT_FREQUENCY
-#define SPI0_DEFAULT_FREQUENCY 1073741824
+#define SPI0_DEFAULT_FREQUENCY 134217728
 #endif
 
 // </e>
@@ -2474,7 +2474,7 @@
 // <e> MEM_MANAGER_ENABLED - mem_manager - Dynamic memory allocator
 //==========================================================
 #ifndef MEM_MANAGER_ENABLED
-#define MEM_MANAGER_ENABLED 0
+#define MEM_MANAGER_ENABLED 1
 #endif
 // <o> MEMORY_MANAGER_SMALL_BLOCK_COUNT - Size of each memory blocks identified as 'small' block.  <0-255> 
 
